@@ -1,0 +1,7 @@
+name: example-skill
+description: 示例技能，用于演示技能目录结构与调用方式
+triggers:
+  - 当任务需要复用标准化流程时
+usage:
+  install: bash .agents/skills/example-skill/install.sh
+  run: 阅读 README.md 并按步骤执行

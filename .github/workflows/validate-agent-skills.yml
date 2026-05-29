@@ -1,0 +1,75 @@
+name: Validate Agent Skills
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install validator dependency
+        run: python -m pip install --disable-pip-version-check pyyaml
+
+      - name: Validate skills directory and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=".agents/skills"
+
+          if [[ ! -d "$ROOT" ]]; then
+            echo "Missing $ROOT directory"
+            exit 1
+          fi
+
+          # Uses bash-specific mapfile; shell is explicitly set to bash.
+          mapfile -t skill_dirs < <(find "$ROOT" -mindepth 1 -maxdepth 1 -type d | sort)
+          if [[ ${#skill_dirs[@]} -eq 0 ]]; then
+            echo "No skill directories found under $ROOT"
+            exit 1
+          fi
+
+          for dir in "${skill_dirs[@]}"; do
+            skill_name="$(basename "$dir")"
+            if [[ ! "$skill_name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+              echo "Invalid skill directory name: $skill_name (must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$)"
+              exit 1
+            fi
+
+            for required in skill.yaml README.md; do
+              if [[ ! -f "$dir/$required" ]]; then
+                echo "Missing $required in $dir"
+                exit 1
+              fi
+            done
+
+            python - "$dir/skill.yaml" <<'PY'
+import sys
+import yaml
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as f:
+    data = yaml.safe_load(f)
+
+if not isinstance(data, dict):
+    sys.exit("skill.yaml must contain top-level key-value pairs in: {}".format(path))
+
+required = ["name", "description", "triggers", "usage"]
+missing = [key for key in required if key not in data]
+if missing:
+    sys.exit("Missing {} in {}".format(", ".join(missing), path))
+PY
+          done
+
+          echo "Skill validation passed."
