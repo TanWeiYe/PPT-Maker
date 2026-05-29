@@ -1,0 +1,63 @@
+name: Validate Agent Skills
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  validate-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate skills directory and metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=".agents/skills"
+
+          if [[ ! -d "$ROOT" ]]; then
+            echo "Missing $ROOT directory"
+            exit 1
+          fi
+
+          mapfile -t skill_dirs < <(find "$ROOT" -mindepth 1 -maxdepth 1 -type d | sort)
+          if [[ ${#skill_dirs[@]} -eq 0 ]]; then
+            echo "No skill directories found under $ROOT"
+            exit 1
+          fi
+
+          for dir in "${skill_dirs[@]}"; do
+            skill_name="$(basename "$dir")"
+            if [[ ! "$skill_name" =~ ^[a-z0-9-]+$ ]]; then
+              echo "Invalid skill directory name: $skill_name"
+              exit 1
+            fi
+
+            for required in skill.yaml README.md; do
+              if [[ ! -f "$dir/$required" ]]; then
+                echo "Missing $required in $dir"
+                exit 1
+              fi
+            done
+
+            python - "$dir/skill.yaml" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", encoding="utf-8").read()
+required = ["name", "description", "triggers", "usage"]
+for key in required:
+    if not re.search(rf"(?m)^{key}\s*:", text):
+        raise SystemExit(f"Missing '{key}' in {path}")
+PY
+
+            if [[ -f "$dir/install.sh" ]] && [[ ! -x "$dir/install.sh" ]]; then
+              echo "install.sh exists but is not executable in $dir"
+              exit 1
+            fi
+          done
+
+          echo "Skill validation passed."
