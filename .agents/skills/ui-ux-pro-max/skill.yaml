@@ -1,0 +1,11 @@
+name: ui-ux-pro-max
+description: Advanced UI/UX design analysis and frontend implementation guidance skill
+triggers:
+  - "use ui-ux-pro-max"
+  - "ui-ux-pro-max"
+  - "使用 UI-UX-PRO-MAX"
+usage: |
+  When the user asks to use UI-UX-PRO-MAX:
+  1. Start with current-state analysis and prioritized UX issues following prompts/skill.md.
+  2. Propose a clear design strategy with actionable implementation steps.
+  3. Provide practical frontend improvements including accessibility, responsiveness, and performance checks.
