@@ -4,12 +4,23 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
+
 jobs:
   validate-skills:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install validator dependency
+        run: python -m pip install --disable-pip-version-check pyyaml
 
       - name: Validate skills directory and metadata
         shell: bash
@@ -22,6 +33,7 @@ jobs:
             exit 1
           fi
 
+          # Uses bash-specific mapfile; shell is explicitly set to bash.
           mapfile -t skill_dirs < <(find "$ROOT" -mindepth 1 -maxdepth 1 -type d | sort)
           if [[ ${#skill_dirs[@]} -eq 0 ]]; then
             echo "No skill directories found under $ROOT"
@@ -30,8 +42,8 @@ jobs:
 
           for dir in "${skill_dirs[@]}"; do
             skill_name="$(basename "$dir")"
-            if [[ ! "$skill_name" =~ ^[a-z0-9-]+$ ]]; then
-              echo "Invalid skill directory name: $skill_name"
+            if [[ ! "$skill_name" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
+              echo "Invalid skill directory name: $skill_name (must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$)"
               exit 1
             fi
 
@@ -43,21 +55,21 @@ jobs:
             done
 
             python - "$dir/skill.yaml" <<'PY'
-import re
 import sys
+import yaml
 
 path = sys.argv[1]
-text = open(path, "r", encoding="utf-8").read()
-required = ["name", "description", "triggers", "usage"]
-for key in required:
-    if not re.search(rf"(?m)^{key}\s*:", text):
-        raise SystemExit(f"Missing '{key}' in {path}")
-PY
+with open(path, "r", encoding="utf-8") as f:
+    data = yaml.safe_load(f)
 
-            if [[ -f "$dir/install.sh" ]] && [[ ! -x "$dir/install.sh" ]]; then
-              echo "install.sh exists but is not executable in $dir"
-              exit 1
-            fi
+if not isinstance(data, dict):
+    sys.exit("skill.yaml must contain top-level key-value pairs in: {}".format(path))
+
+required = ["name", "description", "triggers", "usage"]
+missing = [key for key in required if key not in data]
+if missing:
+    sys.exit("Missing {} in {}".format(", ".join(missing), path))
+PY
           done
 
           echo "Skill validation passed."

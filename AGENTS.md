@@ -16,9 +16,10 @@
 - 每个技能目录至少包含：
   - `skill.yaml`：技能元数据（名称、说明、触发条件、安装与使用方式）
   - `README.md`：面向代理与维护者的说明
+- 约定所有 `install.sh` 通过 `bash <path>` 显式调用，而不是依赖 shebang 直接执行。
 - 稳定工作流约定：
   1. **发现（Discover）**：按目录名排序扫描 `.agents/skills/*/skill.yaml`，建立可用技能清单。
-  2. **安装（Install）**：若技能目录存在 `install.sh`，在仓库根目录执行 `bash .agents/skills/<skill-name>/install.sh`。
+  2. **安装（Install）**：若技能目录存在 `install.sh`，在仓库根目录执行 `bash .agents/skills/<skill-name>/install.sh`（显式用 bash 调用时可不依赖可执行位）。
   3. **使用（Use）**：按 `skill.yaml` 中声明的入口与步骤执行；执行前先读取技能 `README.md`。
   4. **失败降级（Fallback）**：安装失败时不得阻塞主任务，记录原因并回退到仓库默认实现路径。
 
