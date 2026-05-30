@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+web/uploads/
+web/generated/
+.env
