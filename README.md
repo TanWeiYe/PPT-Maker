@@ -55,6 +55,23 @@ python3 web/app.py
 - 复杂内容生产与高保真生成能力可继续下沉到 `ppt-master` 脚本流水线
 - 本仓库已保留技能目录：`.agents/skills/ppt-master`
 
+
+## GitHub Codespaces 开发
+
+仓库已提供 `.devcontainer/` 配置，创建 Codespace 后会自动完成：
+
+1. 安装 Python/Node 环境依赖
+2. 安装 FFmpeg
+3. 安装后端 `requirements.txt` 依赖
+4. 自动初始化 `.env`（若存在 `.env.example`）
+5. 自动启动 Python 后端（`5000`）与 Vue 前端（`5173`，检测到 Vue 项目时）
+6. 自动转发端口：
+   - `5000`：Flask 后端
+   - `5173`：Vue 前端
+
+> 如果仓库中尚未包含 Vue `package.json`，Codespaces 会跳过前端依赖安装和前端启动。
+> 服务日志默认输出到 `.devcontainer/.logs/backend.log` 和 `.devcontainer/.logs/frontend.log`（若前端已启动）。
+
 ## 本地运行方式
 
 ```bash
