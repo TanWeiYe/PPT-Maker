@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PPT Maker Web MVP</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>学生向美观 PPT 生成（网页 MVP）</h1>
+      <p class="hint">支持：AI 对话文本、PDF、Word、图片、网页链接、模板和素材上传。</p>
+
+      <section class="card">
+        <h2>1) 生成文本大纲</h2>
+        <label>需求描述 / 对话内容</label>
+        <textarea id="prompt" rows="6" placeholder="例如：为高一学生做一份‘人工智能入门’课堂汇报"></textarea>
+
+        <label>网页链接（可选）</label>
+        <input id="sourceUrl" type="url" placeholder="https://example.com/article" />
+
+        <label>上传源文件（可多选）</label>
+        <input id="files" type="file" multiple />
+
+        <button id="outlineBtn">生成大纲</button>
+      </section>
+
+      <section class="card">
+        <h2>2) 基于大纲生成 PPTX</h2>
+        <label>可编辑大纲</label>
+        <textarea id="outline" rows="10" placeholder="大纲会显示在这里，可手动修改"></textarea>
+        <button id="generateBtn">生成并导出 PPTX</button>
+        <a id="downloadLink" class="hidden" href="#">下载 PPTX</a>
+      </section>
+
+      <pre id="log" class="log"></pre>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
