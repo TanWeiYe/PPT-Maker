@@ -35,7 +35,7 @@ elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5000 >/dev/null 2>&1; } || { [ "$HAS_
   nohup env PORT=5000 python3 "$BACKEND_ENTRY" > "$BACKEND_LOG" 2>&1 &
   BACKEND_PID=$!
   sleep 2
-  if kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
+  if { [ "$HAS_LSOF" -eq 1 ] && lsof -ti:5000 >/dev/null 2>&1; } || kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
     BACKEND_STARTED=1
   else
     echo "[devcontainer] Backend failed to start. Check $BACKEND_LOG for details."
