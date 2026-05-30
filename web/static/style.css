@@ -58,6 +58,17 @@ button {
   cursor: pointer;
 }
 
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.secondary {
+  background: #eef1ff;
+  color: #334;
+}
+
 .log {
   background: #111827;
   color: #d1f5d3;

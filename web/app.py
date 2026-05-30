@@ -22,6 +22,7 @@ UPLOAD_DIR = WEB_DIR / "uploads"
 GENERATED_DIR = WEB_DIR / "generated"
 SKILL_DIR = ROOT_DIR / ".agents" / "skills" / "ppt-master"
 SCRIPTS_DIR = SKILL_DIR / "scripts"
+SAMPLE_DATA_PATH = ROOT_DIR / "examples" / "sample-data.json"
 
 ALLOWED_EXTENSIONS = {
     ".pdf",
@@ -35,6 +36,7 @@ ALLOWED_EXTENSIONS = {
     ".webp",
     ".pptx",
 }
+SESSION_ID_PATTERN = re.compile(r"^[a-f0-9-]{8,64}$")
 MAX_CONTEXT_CHARS = 4000
 MAX_OUTLINE_POINT_LENGTH = 36
 SUPPORTED_SOURCE_SCRIPTS = {
@@ -59,8 +61,14 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def normalize_session_id(session_id: str | None = None) -> str:
+    if session_id and SESSION_ID_PATTERN.fullmatch(session_id):
+        return session_id
+    return str(uuid.uuid4())
+
+
 def init_session(session_id: str | None = None) -> SessionData:
-    sid = session_id or str(uuid.uuid4())
+    sid = normalize_session_id(session_id)
     root = WEB_DIR / "runtime" / sid
     upload_dir = root / "uploads"
     generated_dir = root / "generated"
@@ -241,9 +249,37 @@ def convert_sources_with_ppt_master(uploaded: list[Path], session: SessionData, 
     return converted
 
 
+def load_sample_payload() -> dict[str, str]:
+    fallback = {
+        "title": "人工智能课堂汇报（示例）",
+        "prompt": "为高一学生制作一份人工智能入门课堂汇报，包含概念、应用、风险与学习建议。",
+        "source_url": "https://en.wikipedia.org/wiki/Artificial_intelligence",
+        "outline": "1. 封面：人工智能入门\n2. 人工智能是什么\n3. 典型应用场景\n4. 机遇与风险\n5. 学习建议\n6. 总结",
+    }
+    if not SAMPLE_DATA_PATH.exists():
+        return fallback
+    try:
+        loaded = json.loads(SAMPLE_DATA_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return fallback
+    if not isinstance(loaded, dict):
+        return fallback
+    return {
+        "title": str(loaded.get("title", fallback["title"])),
+        "prompt": str(loaded.get("prompt", fallback["prompt"])),
+        "source_url": str(loaded.get("source_url", fallback["source_url"])),
+        "outline": str(loaded.get("outline", fallback["outline"])),
+    }
+
+
 @app.get("/")
 def index():
     return render_template("index.html")
+
+
+@app.get("/api/sample")
+def sample_payload():
+    return jsonify(load_sample_payload())
 
 
 @app.post("/api/outline")
@@ -297,7 +333,10 @@ def generate_pptx():
 
     slides = parse_outline_to_slides(outline)
     output_path = session.generated_dir / "presentation.pptx"
-    build_pptx(slides, output_path, template_path)
+    try:
+        build_pptx(slides, output_path, template_path)
+    except (OSError, ValueError) as exc:
+        return jsonify({"error": f"failed to build pptx: {exc}"}), 500
 
     return jsonify(
         {
@@ -315,7 +354,7 @@ def generate_pptx():
 
 @app.get("/api/download/<session_id>/<filename>")
 def download(session_id: str, filename: str):
-    if not re.fullmatch(r"[a-f0-9-]{8,64}", session_id):
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
         return jsonify({"error": "invalid session id"}), 400
     if Path(filename).name != filename or not filename.endswith(".pptx"):
         return jsonify({"error": "invalid filename"}), 400
