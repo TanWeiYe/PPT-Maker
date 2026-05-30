@@ -50,7 +50,9 @@ class WebAppTestCase(unittest.TestCase):
         download_response = self.client.get(generate_data["download_url"])
         self.assertEqual(download_response.status_code, 200)
         self.assertGreater(len(download_response.data), 0)
+        # Validate downloaded file is a real PPTX: PPTX is a ZIP container and starts with "PK".
         self.assertEqual(download_response.data[:2], b"PK")
+        download_response.close()
 
 
 if __name__ == "__main__":

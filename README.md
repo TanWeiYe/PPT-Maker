@@ -28,7 +28,7 @@ python3 web/app.py
 
 ### 前后端联调能力
 
-- 前端页面：`/tmp/workspace/TanWeiYe/PPT-Maker/web/templates/index.html`
+- 前端页面：`web/templates/index.html`
 - 后端 API：
   - `POST /api/outline`：输入文本/文件/链接，生成可编辑大纲
   - `POST /api/generate`：输入大纲，生成可下载的 PPTX
@@ -37,7 +37,7 @@ python3 web/app.py
 
 ### 示例数据
 
-- 示例配置文件：`/tmp/workspace/TanWeiYe/PPT-Maker/examples/sample-data.json`
+- 示例配置文件：`examples/sample-data.json`
 - 前端点击“加载示例数据”即可自动填充 prompt、链接和大纲，再一键走通生成流程。
 
 ### 模板能力
@@ -53,12 +53,12 @@ python3 web/app.py
 
 - 网页端负责接收文件、AI 对话入口、结果下载
 - 复杂内容生产与高保真生成能力可继续下沉到 `ppt-master` 脚本流水线
-- 本仓库已保留技能目录：`/tmp/workspace/TanWeiYe/PPT-Maker/.agents/skills/ppt-master`
+- 本仓库已保留技能目录：`.agents/skills/ppt-master`
 
 ## 本地运行方式
 
 ```bash
-cd /tmp/workspace/TanWeiYe/PPT-Maker
+cd "$(git rev-parse --show-toplevel)"
 python3 -m pip install -r requirements.txt
 python3 web/app.py
 ```
@@ -70,7 +70,7 @@ python3 web/app.py
 执行后端自动化测试：
 
 ```bash
-cd /tmp/workspace/TanWeiYe/PPT-Maker
+cd "$(git rev-parse --show-toplevel)"
 python3 -m unittest discover -s tests -v
 ```
 

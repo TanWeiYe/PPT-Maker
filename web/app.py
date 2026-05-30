@@ -261,15 +261,15 @@ def load_sample_payload() -> dict[str, str]:
     try:
         loaded = json.loads(SAMPLE_DATA_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        app.logger.warning("sample data unavailable, fallback applied")
         return fallback
     if not isinstance(loaded, dict):
         return fallback
-    return {
-        "title": str(loaded.get("title", fallback["title"])),
-        "prompt": str(loaded.get("prompt", fallback["prompt"])),
-        "source_url": str(loaded.get("source_url", fallback["source_url"])),
-        "outline": str(loaded.get("outline", fallback["outline"])),
-    }
+    result: dict[str, str] = {}
+    for key, default in fallback.items():
+        value = loaded.get(key, default)
+        result[key] = value if isinstance(value, str) and value.strip() else default
+    return result
 
 
 @app.get("/")
@@ -285,6 +285,8 @@ def sample_payload():
 @app.post("/api/outline")
 def generate_outline():
     session_id = request.form.get("session_id")
+    if session_id and not SESSION_ID_PATTERN.fullmatch(session_id):
+        return jsonify({"error": "invalid session id"}), 400
     prompt = request.form.get("prompt", "")
     source_url = request.form.get("source_url", "").strip() or None
 
@@ -317,7 +319,10 @@ def generate_outline():
 @app.post("/api/generate")
 def generate_pptx():
     data = request.get_json(silent=True) or {}
-    session = init_session(data.get("session_id"))
+    session_id = data.get("session_id")
+    if session_id and not SESSION_ID_PATTERN.fullmatch(session_id):
+        return jsonify({"error": "invalid session id"}), 400
+    session = init_session(session_id)
 
     outline = data.get("outline", "")
     if not outline:
@@ -335,8 +340,12 @@ def generate_pptx():
     output_path = session.generated_dir / "presentation.pptx"
     try:
         build_pptx(slides, output_path, template_path)
-    except (OSError, ValueError) as exc:
-        return jsonify({"error": f"failed to build pptx: {exc}"}), 500
+    except OSError:
+        app.logger.error("failed to build pptx: OSError")
+        return jsonify({"error": "failed to build pptx: file system error"}), 500
+    except ValueError:
+        app.logger.error("failed to build pptx: ValueError")
+        return jsonify({"error": "failed to build pptx: invalid template"}), 500
 
     return jsonify(
         {
