@@ -1,0 +1,12 @@
+name: ppt-master
+description: AI PPT generation and optimization skill imported from hugohe3/ppt-master
+triggers:
+  - "use ppt-master"
+  - "ppt-master"
+  - "使用 ppt-master"
+  - "生成 PPT"
+usage: |
+  1. Read `.agents/skills/ppt-master/SKILL.md` for complete workflow and constraints.
+  2. Configure required environment variables based on `.env.example`.
+  3. Run the scripts under `.agents/skills/ppt-master/scripts/` according to the task phase in SKILL.md.
+  4. If full templates/references assets are required, fetch them from the upstream repository.
