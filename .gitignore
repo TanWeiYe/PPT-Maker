@@ -4,3 +4,4 @@ web/uploads/
 web/generated/
 web/runtime/
 .env
+.devcontainer/.logs/
