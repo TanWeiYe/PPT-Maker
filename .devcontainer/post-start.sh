@@ -33,7 +33,13 @@ elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5000 >/dev/null 2>&1; } || { [ "$HAS_
   echo "[devcontainer] Starting Python backend ($BACKEND_ENTRY) on port 5000..."
   : > "$BACKEND_LOG"
   nohup env PORT=5000 python3 "$BACKEND_ENTRY" > "$BACKEND_LOG" 2>&1 &
-  BACKEND_STARTED=1
+  BACKEND_PID=$!
+  sleep 2
+  if kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
+    BACKEND_STARTED=1
+  else
+    echo "[devcontainer] Backend failed to start. Check $BACKEND_LOG for details."
+  fi
 else
   echo "[devcontainer] Port 5000 already in use; skipping backend start."
 fi
