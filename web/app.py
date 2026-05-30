@@ -5,10 +5,12 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import urlparse
 
 from flask import Flask, jsonify, render_template, request, send_file
 from pptx import Presentation
@@ -32,6 +34,13 @@ ALLOWED_EXTENSIONS = {
     ".jpeg",
     ".webp",
     ".pptx",
+}
+MAX_CONTEXT_CHARS = 4000
+MAX_OUTLINE_POINT_LENGTH = 36
+SUPPORTED_SOURCE_SCRIPTS = {
+    "pdf": (SCRIPTS_DIR / "source_to_md" / "pdf_to_md.py").resolve(),
+    "doc": (SCRIPTS_DIR / "source_to_md" / "doc_to_md.py").resolve(),
+    "web": (SCRIPTS_DIR / "source_to_md" / "web_to_md.py").resolve(),
 }
 
 
@@ -60,11 +69,13 @@ def init_session(session_id: str | None = None) -> SessionData:
     return SessionData(session_id=sid, root=root, upload_dir=upload_dir, generated_dir=generated_dir)
 
 
-def run_script(args: list[str]) -> tuple[bool, str]:
+def run_ppt_master_script(script: Path, script_args: list[str], cwd: Path | None = None) -> tuple[bool, str]:
+    if script.resolve() not in SUPPORTED_SOURCE_SCRIPTS.values():
+        return False, f"unsupported script path: {script}"
     try:
         result = subprocess.run(
-            args,
-            cwd=str(ROOT_DIR),
+            [sys.executable, str(script), *script_args],
+            cwd=str(cwd or ROOT_DIR),
             check=False,
             capture_output=True,
             text=True,
@@ -73,6 +84,11 @@ def run_script(args: list[str]) -> tuple[bool, str]:
         return False, str(exc)
     output = "\n".join([result.stdout.strip(), result.stderr.strip()]).strip()
     return result.returncode == 0, output
+
+
+def is_safe_http_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
 def normalize_lines(text: str) -> list[str]:
@@ -89,8 +105,10 @@ def simple_outline_from_prompt(prompt: str) -> str:
     if not points:
         points = [prompt]
 
-    top = [f"{index}. {point[:36]}" for index, point in enumerate(points[:8], start=1)]
-    if top[-1] != f"{len(top)+1}. 总结":
+    top = [f"{index}. {point[:MAX_OUTLINE_POINT_LENGTH]}" for index, point in enumerate(points[:8], start=1)]
+    if not top:
+        top = ["1. 封面", "2. 核心内容", "3. 总结"]
+    if not any("总结" in item for item in top):
         top.append(f"{len(top)+1}. 总结")
     return "\n".join(top)
 
@@ -136,9 +154,12 @@ def apply_template_if_provided(session: SessionData, template_file: Path | None)
 
 def build_pptx(slides: Iterable[tuple[str, list[str]]], output_path: Path, template_path: Path | None = None) -> None:
     prs = Presentation(str(template_path)) if template_path else Presentation()
+    if len(prs.slide_layouts) == 0:
+        raise ValueError("PPT 模板中未找到可用版式")
+    body_layout_index = 1 if len(prs.slide_layouts) > 1 else 0
 
     for index, (title, bullets) in enumerate(slides):
-        layout = prs.slide_layouts[0] if index == 0 else prs.slide_layouts[1]
+        layout = prs.slide_layouts[0] if index == 0 else prs.slide_layouts[body_layout_index]
         slide = prs.slides.add_slide(layout)
 
         if slide.shapes.title:
@@ -196,12 +217,12 @@ def convert_sources_with_ppt_master(uploaded: list[Path], session: SessionData, 
         suffix = file_path.suffix.lower()
         converter = None
         if suffix == ".pdf":
-            converter = SCRIPTS_DIR / "source_to_md" / "pdf_to_md.py"
+            converter = SUPPORTED_SOURCE_SCRIPTS["pdf"]
         elif suffix in {".doc", ".docx"}:
-            converter = SCRIPTS_DIR / "source_to_md" / "doc_to_md.py"
+            converter = SUPPORTED_SOURCE_SCRIPTS["doc"]
 
         if converter and converter.exists():
-            ok, _ = run_script(["python3", str(converter), str(file_path)])
+            ok, _ = run_ppt_master_script(converter, [str(file_path)])
             candidate = file_path.with_suffix(".md")
             if ok and candidate.exists():
                 converted.append(candidate)
@@ -209,16 +230,13 @@ def convert_sources_with_ppt_master(uploaded: list[Path], session: SessionData, 
         if suffix in {".md", ".txt"}:
             converted.append(file_path)
 
-    if source_url:
-        web_converter = SCRIPTS_DIR / "source_to_md" / "web_to_md.py"
+    if source_url and is_safe_http_url(source_url):
+        web_converter = SUPPORTED_SOURCE_SCRIPTS["web"]
         if web_converter.exists():
-            ok, _ = run_script(["python3", str(web_converter), source_url])
-            if ok:
-                maybe = Path.cwd() / "web.md"
-                if maybe.exists():
-                    moved = session.upload_dir / f"web_{uuid.uuid4().hex}.md"
-                    shutil.move(str(maybe), moved)
-                    converted.append(moved)
+            web_md = session.upload_dir / f"web_{uuid.uuid4().hex}.md"
+            ok, _ = run_ppt_master_script(web_converter, [source_url, "-o", str(web_md)], cwd=session.upload_dir)
+            if ok and web_md.exists():
+                converted.append(web_md)
 
     return converted
 
@@ -241,9 +259,13 @@ def generate_outline():
     merged_context = [prompt.strip()]
     for file_path in converted:
         try:
-            merged_context.append(file_path.read_text(encoding="utf-8", errors="ignore")[:4000])
+            # Keep context bounded to keep request latency stable for web-side MVP interaction.
+            content = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
+        merged_context.append(content[:MAX_CONTEXT_CHARS])
 
     outline = simple_outline_from_prompt("\n".join([item for item in merged_context if item]))
     payload = {
@@ -266,8 +288,12 @@ def generate_pptx():
         return jsonify({"error": "outline is required"}), 400
 
     template_name = data.get("template_name", "")
-    template_file = session.upload_dir / template_name if template_name else None
-    template_path = apply_template_if_provided(session, template_file if template_file and template_file.exists() else None)
+    template_file = None
+    if template_name:
+        candidate_template = session.upload_dir / template_name
+        if candidate_template.exists():
+            template_file = candidate_template
+    template_path = apply_template_if_provided(session, template_file)
 
     slides = parse_outline_to_slides(outline)
     output_path = session.generated_dir / "presentation.pptx"
@@ -289,7 +315,15 @@ def generate_pptx():
 
 @app.get("/api/download/<session_id>/<filename>")
 def download(session_id: str, filename: str):
-    file_path = WEB_DIR / "runtime" / session_id / "generated" / filename
+    if not re.fullmatch(r"[a-f0-9-]{8,64}", session_id):
+        return jsonify({"error": "invalid session id"}), 400
+    if Path(filename).name != filename or not filename.endswith(".pptx"):
+        return jsonify({"error": "invalid filename"}), 400
+
+    base_dir = (WEB_DIR / "runtime" / session_id / "generated").resolve()
+    file_path = (base_dir / filename).resolve()
+    if not file_path.is_relative_to(base_dir):
+        return jsonify({"error": "invalid path"}), 400
     if not file_path.exists():
         return jsonify({"error": "file not found"}), 404
     return send_file(file_path, as_attachment=True)

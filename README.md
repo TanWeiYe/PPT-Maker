@@ -10,7 +10,7 @@
 ## 快速开始
 
 ```bash
-cd /tmp/workspace/TanWeiYe/PPT-Maker
+cd /path/to/PPT-Maker
 python3 -m pip install -r requirements.txt
 python3 web/app.py
 ```
