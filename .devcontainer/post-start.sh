@@ -29,7 +29,7 @@ done
 
 if [ ! -f "$BACKEND_ENTRY" ]; then
   echo "[devcontainer] Backend entry '$BACKEND_ENTRY' not found; skipping backend start. Set BACKEND_ENTRY to the correct app file if needed."
-elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5000 >/dev/null 2>&1; } || { [ "$HAS_LSOF" -eq 0 ] && ! pgrep -f "python3 $BACKEND_ENTRY" >/dev/null 2>&1; }; then
+elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5000 >/dev/null 2>&1; } || { [ "$HAS_LSOF" -eq 0 ] && ! pgrep -f "python3.*$(basename "$BACKEND_ENTRY")" >/dev/null 2>&1; }; then
   echo "[devcontainer] Starting Python backend ($BACKEND_ENTRY) on port 5000..."
   : > "$BACKEND_LOG"
   nohup env PORT=5000 python3 "$BACKEND_ENTRY" > "$BACKEND_LOG" 2>&1 &
@@ -41,7 +41,7 @@ fi
 if [ -n "$FRONTEND_DIR" ]; then
   if ! grep -q '"dev"[[:space:]]*:' "$FRONTEND_DIR/package.json"; then
     echo "[devcontainer] No 'dev' script found in $FRONTEND_DIR/package.json; skipping frontend start."
-  elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5173 >/dev/null 2>&1; } || { [ "$HAS_LSOF" -eq 0 ] && ! pgrep -f "npm run dev" >/dev/null 2>&1; }; then
+  elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5173 >/dev/null 2>&1; } || { [ "$HAS_LSOF" -eq 0 ] && ! pgrep -f "(vite|npm run dev|vue-cli-service serve)" >/dev/null 2>&1; }; then
     echo "[devcontainer] Starting Vue frontend from '$FRONTEND_DIR' on port 5173..."
     (
       cd "$FRONTEND_DIR"
