@@ -43,12 +43,17 @@ if [ -n "$FRONTEND_DIR" ]; then
     echo "[devcontainer] No 'dev' script found in $FRONTEND_DIR/package.json; skipping frontend start."
   elif { [ "$HAS_LSOF" -eq 1 ] && ! lsof -ti:5173 >/dev/null 2>&1; } || { [ "$HAS_LSOF" -eq 0 ] && ! pgrep -f "(vite|npm run dev|vue-cli-service serve)" >/dev/null 2>&1; }; then
     echo "[devcontainer] Starting Vue frontend from '$FRONTEND_DIR' on port 5173..."
-    (
-      cd "$FRONTEND_DIR"
-      : > "$FRONTEND_LOG"
-      nohup npm run dev -- --host 0.0.0.0 --port 5173 > "$FRONTEND_LOG" 2>&1 &
-    )
-    FRONTEND_STARTED=1
+    : > "$FRONTEND_LOG"
+    cd "$FRONTEND_DIR"
+    nohup npm run dev -- --host 0.0.0.0 --port 5173 > "$FRONTEND_LOG" 2>&1 &
+    FRONTEND_PID=$!
+    cd "$REPO_ROOT"
+    sleep 2
+    if { [ "$HAS_LSOF" -eq 1 ] && lsof -ti:5173 >/dev/null 2>&1; } || kill -0 "$FRONTEND_PID" >/dev/null 2>&1; then
+      FRONTEND_STARTED=1
+    else
+      echo "[devcontainer] Frontend failed to stay up after startup; check $FRONTEND_LOG"
+    fi
   else
     echo "[devcontainer] Port 5173 already in use; skipping frontend start."
   fi
