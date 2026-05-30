@@ -2,6 +2,7 @@ let currentSessionId = "";
 let currentTemplateName = "";
 
 const outlineBtn = document.getElementById("outlineBtn");
+const sampleBtn = document.getElementById("sampleBtn");
 const generateBtn = document.getElementById("generateBtn");
 const logBox = document.getElementById("log");
 const downloadLink = document.getElementById("downloadLink");
@@ -9,6 +10,24 @@ const downloadLink = document.getElementById("downloadLink");
 function log(message) {
   logBox.textContent += `${message}\n`;
 }
+
+sampleBtn.addEventListener("click", async () => {
+  log("正在加载示例数据...");
+  try {
+    const response = await fetch("/api/sample");
+    const data = await response.json();
+    if (!response.ok) {
+      log(`示例数据加载失败: ${data.error || response.statusText}`);
+      return;
+    }
+    document.getElementById("prompt").value = data.prompt || "";
+    document.getElementById("sourceUrl").value = data.source_url || "";
+    document.getElementById("outline").value = data.outline || "";
+    log(`示例数据已加载: ${data.title || "示例"}`);
+  } catch (error) {
+    log(`示例数据加载失败: ${error.message}`);
+  }
+});
 
 outlineBtn.addEventListener("click", async () => {
   const prompt = document.getElementById("prompt").value;
