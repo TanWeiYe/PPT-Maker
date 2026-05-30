@@ -1,4 +1,5 @@
 let sessionId = "";
+let templateName = "";
 
 const outlineBtn = document.getElementById("outlineBtn");
 const generateBtn = document.getElementById("generateBtn");
@@ -32,6 +33,7 @@ outlineBtn.addEventListener("click", async () => {
   }
 
   sessionId = data.session_id;
+  templateName = data.template_name || "";
   document.getElementById("outline").value = data.outline || "";
   log(`大纲生成完成，session: ${sessionId}`);
 });
@@ -47,7 +49,7 @@ generateBtn.addEventListener("click", async () => {
   const response = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, outline }),
+    body: JSON.stringify({ session_id: sessionId, outline, template_name: templateName }),
   });
 
   const data = await response.json();

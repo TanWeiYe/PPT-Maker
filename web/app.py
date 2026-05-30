@@ -183,6 +183,13 @@ def save_uploaded_files(session: SessionData, files) -> list[Path]:
     return saved
 
 
+def detect_template_name(uploaded: list[Path]) -> str | None:
+    for path in uploaded:
+        if path.suffix.lower() == ".pptx":
+            return path.name
+    return None
+
+
 def convert_sources_with_ppt_master(uploaded: list[Path], session: SessionData, source_url: str | None) -> list[Path]:
     converted: list[Path] = []
     for file_path in uploaded:
@@ -243,6 +250,7 @@ def generate_outline():
         "session_id": session.session_id,
         "outline": outline,
         "uploaded_files": [path.name for path in uploaded],
+        "template_name": detect_template_name(uploaded),
     }
     (session.root / "outline.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return jsonify(payload)
